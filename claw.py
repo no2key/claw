@@ -153,13 +153,12 @@ class Spider(object):
 		return re.findall(r"<a\s+href\s*=\s*[\"']*([^\"'\s]+)[\"']*[^<]+</a>",htmlCode)
 
 class StoreURI(object):
-	def __init__(self):
+	def __init__(self,tableName):
 		self.urls = []
-		self.dbName = None
-		self.db = db.DB()
+		self.tableName = tableName.replace('.','_')
+		self.db = db.DB(self.tableName)
 
-	def store(self,dbName):
-		self.dbName = dbName.replace('.','_')
+	def store(self):
 		while True:
 			try:
 				url = outQueue.get(timeout=3)
@@ -177,7 +176,7 @@ class StoreURI(object):
 	def storeUrlToDb(self,url):
 		#当前日期
 		currentDate = time.strftime('%Y-%m-%d') 
-		self.db.insert(self.dbName,url,currentDate)
+		self.db.insert(self.tableName,url,currentDate)
 
 def main(rootUrl,threadCount):
 	spider = Spider()
@@ -194,20 +193,20 @@ def main(rootUrl,threadCount):
 		thread.start()
 
 	#创建存储uri的线程
-	urlObj = StoreURI()
-	urlThread = threading.Thread(target=urlObj.store,args=(spider.domain,))
+	urlObj = StoreURI(spider.domain)
+	urlThread = threading.Thread(target=urlObj.store)
 	urlThread.daemon = True
 	urlThread.start()
 	
 	#等待爬虫线程的结束
 	for _ in threadsPool: _.join()
-	print u'完成url爬取'
 
 	#通知存储线程结束
 	outQueue.put('kill you,by:lu4nx')
 
 	#等待url处理线程结束
 	urlThread.join()
+	print u'完成url爬取'
 
 if __name__ == '__main__':
 	opt = optparse.OptionParser(version='0.1',
