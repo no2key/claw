@@ -31,12 +31,12 @@ class DownloadPage(object):
 	def fetchHtmlCode(self,url,numOfRetries=3):
 		'''下载网页的代码,numOfRetries是超时后重试次数'''
 		try:
+			time.sleep(1)	#为了解决加速乐防cc
 			urlRequest = urllib.Request(url,headers=customHeaders)
 			self.sock = urllib.urlopen(urlRequest,timeout=20)
 			return self.extractHTML(self.sock.read())
 		except Exception,err:
 			print u'access %s error,info:\n%s'%(url,err)
-#			time.sleep(1)	#为了解决加速乐防cc
 			#请求失败后的重试机制
 			if numOfRetries <= 0:
 		#		print u'重试失败'
