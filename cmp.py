@@ -1,6 +1,8 @@
 #!/bin/env python
 #coding=utf-8
 
+##提取日志用的，跟爬虫无关
+
 import sys
 
 uriList = []
