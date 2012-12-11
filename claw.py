@@ -66,7 +66,7 @@ class Spider(object):
 		self.domain = None
 		self.visited = []		#记录已爬过的url
 
-	def spider(self,threadId):
+	def spider(self):
 		'''从队列中取url。直到urlQueue为空，超时后产生Queue.Empty异常并结束线程'''
 		downPageObj = DownloadPage()
 
@@ -75,7 +75,7 @@ class Spider(object):
 				url = urlQueue.get(timeout=10)
 				urlQueue.task_done()
 			except Queue.Empty:
-				print u'kill thread%s'%threadId
+				print 'kill %s'%threading.currentThread().getName()
 				break
 
 			#md5加密url，固定长度，节约内存
@@ -216,7 +216,7 @@ def main(rootUrl,threadCount):
 
 	#创建爬虫的线程池
 	for i in range(threadCount):
-		thread = threading.Thread(target=spider.spider,args=(i,))
+		thread = threading.Thread(target=spider.spider)
 		thread.daemon = True
 		threadsPool.append(thread)
 		thread.start()
