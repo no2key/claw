@@ -1,5 +1,5 @@
 <?php
-	//注入问题暂时不解决
+	//注入问题暂时不解决:-)
 	$domain = $_GET['domain'];
 	$dbName = str_replace('.','_',$domain);
 	$con = mysql_connect("localhost", "root", "mysql");
