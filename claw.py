@@ -36,7 +36,7 @@ class DownloadPage(object):
 			return self.extractHTML(self.sock.read())
 		except Exception,err:
 			print u'access %s error,info:\n%s'%(url,err)
-#			time.sleep(5)	#为了解决加速乐防cc
+#			time.sleep(1)	#为了解决加速乐防cc
 			#请求失败后的重试机制
 			if numOfRetries <= 0:
 		#		print u'重试失败'
@@ -146,6 +146,7 @@ class Spider(object):
 		'''抓取图片、js、css等链接'''
 		otherResource = re.findall(r"<script\s.*src\s*=\s*[\"']*([^\"'\s]+).*",htmlCode)
 		otherResource += re.findall(r"<link.*href\s*=\s*[\"']*([^\"'\s]+).*",htmlCode)
+		otherResource += re.findall(r"<img\s.*src\s*=[\"']*([^\"'\s]+).*",htmlCode)
 		return otherResource
 
 	def fetchUrls(self,htmlCode):
