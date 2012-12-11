@@ -105,8 +105,8 @@ class Spider(object):
 				realLink = link
 				link = urlparse.urljoin(realUrl,link)
 				#同一个站点的url才保存
-#				if self._isSomeDomain(link):
-				if self._isSameSite(link): 
+#				if self.isSameDomain(link):
+				if self.isSameSite(link): 
 					inPagelinks.append(link)
 					outQueue.put(realLink)
 
@@ -115,18 +115,14 @@ class Spider(object):
 
 			for url in inPagelinks: urlQueue.put(url)
 
-	def _isSomeSite(self,url):
-		'''删除其他站点的链接，如:www.xxx.com，页面中出现d1.xxx.com，将一并爬行'''
-		if self._isSameSite(url): return True
-		else: return False
-
-	def _isSomeDomain(self,url):
-		'''删除其他域的超链接，如:www.xxx.com，页面中包含t1.xxx.com链接，后者将不会爬行'''
+	def isSameDomain(self,url):
+		"""判断url的域名与所爬网站的域名是否相等
+		"""
 		if self.getUrlDomain(url) == self.domain: return True
 		else: return False
 
-	def _isSameSite(self,url):
-		'''判断url是否和当前爬虫工作所在url是来自同一站点'''
+	def isSameSite(self,url):
+		'''判断url是否与所爬的url来自同一站点'''
 		#www.xxx.com -> .xxx.com
 		domain1 = self.domain[self.domain.find('.'):]
 		domain2 = self.getUrlDomain(url)
@@ -137,16 +133,40 @@ class Spider(object):
 
 	def getUrlDomain(self,destUrl):
 		"""
-		>>> Spider().getUrlDomain('http://xxx.com/test')
+		>>> spider = Spider()
+		>>> spider.domain = 'lx.shellcodes.org'
+		>>> spider.getUrlDomain('http://xxx.com/test')
 		'xxx.com'
+		>>> spider.getUrlDomain('lx.shellcodes.org')
+		'lx.shellcodes.org'
 		"""
-		return  urlparse.urlparse(destUrl).netloc
+		if destUrl == self.domain: return destUrl
+		else: return urlparse.urlparse(destUrl).netloc
 
 	def fetchOtherResource(self,htmlCode):
-		'''抓取图片、js、css等链接'''
-		otherResource = re.findall(r"<script\s.*src\s*=\s*[\"']*([^\"'\s]+).*",htmlCode)
-		otherResource += re.findall(r"<link.*href\s*=\s*[\"']*([^\"'\s]+).*",htmlCode)
-		otherResource += re.findall(r"<img\s.*src\s*=[\"']*([^\"'\s]+).*",htmlCode)
+		"""抓取图片、js、css等链接
+		>>> spider = Spider()
+		>>> spider.domain = 'lx.shellcodes.org'
+		>>> htmlCode = '<img src="http://www.baidu.com/logo.png">'
+		>>> spider.fetchOtherResource(htmlCode)	
+		[]
+		>>> htmlCode =  '<img src="http://lx.shellcodes.org/logo.png">'
+		>>> spider.fetchOtherResource(htmlCode)
+		['http://lx.shellcodes.org/logo.png']
+		"""
+		otherResource = []
+		scriptTags = re.findall(r"<script\s.*src\s*=\s*[\"']*([^\"'\s]+).*",htmlCode)
+		linkTags = re.findall(r"<link.*href\s*=\s*[\"']*([^\"'\s]+).*",htmlCode)
+		imgTags = re.findall(r"<img\s.*src\s*=[\"']*([^\"'\s]+).*",htmlCode)
+
+		#不需要来自其他网站的外部链接
+		for src in scriptTags+linkTags+imgTags:
+			srcURL = urlparse.urlparse(src)
+
+			#如果链接里有域名，就看是不是来自自己网站的
+			if srcURL.netloc == '': otherResource.append(src)
+			elif self.isSameDomain(srcURL.netloc): otherResource.append(src)
+				
 		return otherResource
 
 	def fetchUrls(self,htmlCode):
