@@ -78,7 +78,7 @@ class Spider(object):
 				print u'kill thread%s'%threadId
 				break
 
-			#url用md5加密下，固定长度，节约内存
+			#md5加密url，固定长度，节约内存
 			if hashlib.md5(url).hexdigest() in self.visited: continue
 			#在对url发起连接的之前就把这个url保存起来，如果无法打开这个url，再遇到这个url时就不用再去连接一次了
 			else:self.visited.append(hashlib.md5(url).hexdigest())
