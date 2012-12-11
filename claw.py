@@ -104,8 +104,8 @@ class Spider(object):
 				elif link.find('#') != -1 or link[0:11] == ('javascript:'): continue
 				realLink = link
 				link = urlparse.urljoin(realUrl,link)
-				#同一个站点的url才保存
 #				if self.isSameDomain(link):
+				#同一个站点的url才保存
 				if self.isSameSite(link): 
 					inPagelinks.append(link)
 					outQueue.put(realLink)
@@ -153,11 +153,17 @@ class Spider(object):
 		>>> htmlCode =  '<img src="http://lx.shellcodes.org/logo.png">'
 		>>> spider.fetchOtherResource(htmlCode)
 		['http://lx.shellcodes.org/logo.png']
+		>>> htmlCode =  '<img src="http://lx.shellcodes.org/logo.png" />'
+		>>> spider.fetchOtherResource(htmlCode)
+		['http://lx.shellcodes.org/logo.png']
+		>>> htmlCode =  '<IMG src="http://lx.shellcodes.org/logo.png" />'
+		>>> spider.fetchOtherResource(htmlCode)
+		['http://lx.shellcodes.org/logo.png']
 		"""
 		otherResource = []
-		scriptTags = re.findall(r"<script\s.*src\s*=\s*[\"']*([^\"'\s]+).*",htmlCode)
-		linkTags = re.findall(r"<link.*href\s*=\s*[\"']*([^\"'\s]+).*",htmlCode)
-		imgTags = re.findall(r"<img\s.*src\s*=[\"']*([^\"'\s]+).*",htmlCode)
+		scriptTags = re.findall(r"(?i)<script\s.*src\s*=\s*[\"']*([^\"'\s]+).*",htmlCode)
+		linkTags = re.findall(r"(?i)<link.*href\s*=\s*[\"']*([^\"'\s]+).*",htmlCode)
+		imgTags = re.findall(r"(?i)<img\s.*src\s*=[\"']*([^\"'\s]+).*",htmlCode)
 
 		#不需要来自其他网站的外部链接
 		for src in scriptTags+linkTags+imgTags:
