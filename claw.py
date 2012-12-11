@@ -202,6 +202,7 @@ class StoreURI(object):
 				self.storeUrlToDb(url)
 
 	def storeUrlToDb(self,url):
+		'''实时存储到数据库中'''
 		#当前日期
 		currentDate = time.strftime('%Y-%m-%d') 
 		self.db.insert(self.tableName,url,currentDate)
