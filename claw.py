@@ -178,7 +178,7 @@ class Spider(object):
 
 	def fetchUrls(self,htmlCode):
 		'''从html代码中提取超链接'''
-		return re.findall(r"<a\s+href\s*=\s*[\"']*([^\"'\s]+)[\"']*[^<]+</a>",htmlCode)
+		return re.findall(r"(?i)<a\s+href\s*=\s*[\"']*([^\"'\s]+)[\"']*[^<]+</a>",htmlCode)
 
 class StoreURI(object):
 	def __init__(self,tableName):
@@ -232,7 +232,7 @@ def main(rootUrl,threadCount):
 	#通知存储线程结束
 	outQueue.put('kill you,by:lu4nx')
 
-	#等待url处理线程结束
+	#等待uri存储线程结束
 	urlThread.join()
 	print u'完成url爬取'
 
