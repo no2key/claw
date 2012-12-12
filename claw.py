@@ -62,6 +62,7 @@ class DownloadPage(object):
 		self.sock.close
 	
 class Spider(object):
+	'''爬虫主类，从url队列中不断获得url进行爬取'''
 	def __init__(self):
 		self.domain = None
 		self.visited = []		#记录已爬过的url
@@ -117,8 +118,7 @@ class Spider(object):
 			for url in inPagelinks: urlQueue.put(url)
 
 	def isSameDomain(self,url):
-		"""判断url的域名与所爬网站的域名是否相等
-		"""
+		'''判断url的域名与所爬网站的域名是否相等'''
 		if self.getUrlDomain(url) == self.domain: return True
 		else: return False
 
