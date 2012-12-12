@@ -216,7 +216,7 @@ class StoreURI(object):
 				print url
 				try: self.storeUrlToDb(url)
 				except Exception,err:
-					log.exception('insert to db error:%s'%err)
+					log.exception('url %s insert to db error:%s'%(url,err))
 					continue
 
 	def storeUrlToDb(self,url):
