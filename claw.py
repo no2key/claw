@@ -214,7 +214,10 @@ class StoreURI(object):
 			if url not in self.urls:
 				self.urls.append(url)
 				print url
-				self.storeUrlToDb(url)
+				try: self.storeUrlToDb(url)
+				except Exception,err:
+					log.exception('insert to db error:%s'%err)
+					continue
 
 	def storeUrlToDb(self,url):
 		'''实时存储到数据库中'''

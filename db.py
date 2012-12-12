@@ -40,12 +40,8 @@ class DB(object):
 			tableName = tableName.replace('.','_')
 			tableName = tableName.replace('-','_')
 
-			try:
-				self.cur.execute("insert into %s(url,update_date) values ('%s','%s');"%(tableName,url,update_date))
-				self.conn.commit()
-			except Exception:
-				return	
-				#NOTE:记录下异常
+			self.cur.execute("insert into %s(url,update_date) values ('%s','%s');"%(tableName,url,update_date))
+			self.conn.commit()
 		else: print 'database connect error'
 		
 	def __del__(self):
