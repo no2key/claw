@@ -7,7 +7,7 @@
 
 import urllib2 as urllib
 import db
-import optparse,threading,Queue,urlparse,time,os,sys,re,gzip,StringIO,hashlib
+import optparse,threading,Queue,urlparse,time,os,sys,re,gzip,StringIO,hashlib,logging
 #threading._VERBOSE=True	#线程调试
 
 urlQueue = Queue.Queue()
@@ -23,6 +23,12 @@ customHeaders = {#'User-Agent':'by:lu4nx',
 				 'Referer':'http://www.baidu.com/s?wd=lu4nx',
 				}
 
+#配置日志
+log = logging.getLogger('claw')
+#记录请求失败的网站
+urlForOpenError = logging.getLogger('urlerror')
+logging.basicConfig(filename='claw_log.log',filemode='w',format='%(name)s %(levelname)s:%(asctime)s %(threadName)s %(message)s')
+
 class DownloadPage(object):
 	'''下载网页代码'''
 	def __init__(self):
@@ -36,14 +42,12 @@ class DownloadPage(object):
 			self.sock = urllib.urlopen(urlRequest,timeout=20)
 			return self.extractHTML(self.sock.read())
 		except Exception,err:
-			print u'access %s error,info:\n%s'%(url,err)
 			#请求失败后的重试机制
 			if numOfRetries <= 0:
-		#		print u'重试失败'
+				#把重试失败的记录写到日志文件中
+				urlForOpenError.warning('%s--%s'%(url,err))
 				return None
-			else:
-		#		print u'重试%s次'%(numOfRetries-1)
-				self.fetchHtmlCode(url,numOfRetries-1)
+			else:self.fetchHtmlCode(url,numOfRetries-1)
 
 	def extractHTML(self,htmlCode):
 		'''解压Gzip压缩过的HTML代码'''
@@ -145,7 +149,7 @@ class Spider(object):
 		else: return urlparse.urlparse(destUrl).netloc
 
 	def fetchOtherResource(self,htmlCode):
-		"""抓取图片、js、css等链接
+		"""抓取图片、js、css、flash、iframe等链接
 		>>> spider = Spider()
 		>>> spider.domain = 'lx.shellcodes.org'
 		>>> htmlCode = '<img src="http://www.baidu.com/logo.png">'
@@ -160,14 +164,25 @@ class Spider(object):
 		>>> htmlCode =  '<IMG src="http://lx.shellcodes.org/logo.png" />'
 		>>> spider.fetchOtherResource(htmlCode)
 		['http://lx.shellcodes.org/logo.png']
+		>>> htmlCode = '<embed src="lx.swf" type="application/x-shockwave-flash"></embed>'
+		>>> spider.fetchOtherResource(htmlCode)
+		['lx.swf']
+		>>> htmlCode = '<embed src="http://lx.com/lx.swf" type="application/x-shockwave-flash"></embed>'
+		>>> spider.fetchOtherResource(htmlCode)
+		[]
+		>>> htmlCode = '<iframe height="256" frameborder="0" width="180" scrolling="" align="center" src="lx.html" name="dmain" marginwidth="0" marginheight="0"></iframe>'
+		>>> spider.fetchOtherResource(htmlCode)
+		['lx.html']
 		"""
 		otherResource = []
 		scriptTags = re.findall(r"(?i)<script\s.*src\s*=\s*[\"']*([^\"'\s]+).*",htmlCode)
 		linkTags = re.findall(r"(?i)<link.*href\s*=\s*[\"']*([^\"'\s]+).*",htmlCode)
 		imgTags = re.findall(r"(?i)<img\s.*src\s*=[\"']*([^\"'\s]+).*",htmlCode)
+		embedTags = re.findall(r"(?i)<embed\s.*src\s*=[\"']*([^\"'\s]+).*",htmlCode)
+		iframeTags = re.findall(r"(?i)<iframe\s.*src\s*=[\"']*([^\"'\s]+).*",htmlCode)
 
 		#不需要来自其他网站的外部链接
-		for src in scriptTags+linkTags+imgTags:
+		for src in scriptTags+linkTags+imgTags+embedTags+iframeTags:
 			srcURL = urlparse.urlparse(src)
 
 			#如果链接里有域名，就看是不是来自自己网站的
@@ -220,7 +235,7 @@ def main(rootUrl,threadCount):
 		thread.daemon = True
 		threadsPool.append(thread)
 		thread.start()
-
+	
 	#创建存储uri的线程
 	urlObj = StoreURI(spider.domain)
 	urlThread = threading.Thread(target=urlObj.store)

@@ -11,7 +11,7 @@ if __name__ == '__main__':
 	try:
 		uriFile = sys.argv[1]
 	except:
-		print 'usage:cmpUri [uri file]'
+		print 'usage:cmp [uri file]'
 		sys.exit(1)
 
 	with open(uriFile,'r') as uriFileObj:
