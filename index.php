@@ -18,7 +18,7 @@
 	while($row = mysql_fetch_assoc($result))
 	{
 		echo $row['update_date'].': ';
-		echo $row['url'].'<br />';
+		echo $row['uri'].'<br />';
 	}
 
 	mysql_close($con);
