@@ -6,8 +6,8 @@
 ##2012.12.07
 
 import urllib2 as urllib
+import optparse,threading,Queue,urlparse,time,os,sys,re,gzip,StringIO,hashlib,logging,cPickle
 import db
-import optparse,threading,Queue,urlparse,time,os,sys,re,gzip,StringIO,hashlib,logging
 #threading._VERBOSE=True	#线程调试
 
 urlQueue = Queue.Queue()
@@ -23,11 +23,13 @@ customHeaders = {#'User-Agent':'by:lu4nx',
 				 'Referer':'http://www.baidu.com/s?wd=lu4nx',
 				}
 
+#日志文件
+logFile = 'claw_log.log'
 #配置日志
 log = logging.getLogger('claw')
 #记录请求失败的网站
 urlForOpenError = logging.getLogger('urlerror')
-logging.basicConfig(filename='claw_log.log',filemode='w',format='%(name)s %(levelname)s:%(asctime)s %(threadName)s %(message)s')
+logging.basicConfig(filename=logFile,filemode='w',format='%(name)s|%(levelname)s|%(asctime)s|%(threadName)s|%(message)s')
 
 class DownloadPage(object):
 	'''下载网页代码'''
@@ -45,7 +47,7 @@ class DownloadPage(object):
 			#请求失败后的重试机制
 			if numOfRetries <= 0:
 				#把重试失败的记录写到日志文件中
-				urlForOpenError.warning('%s--%s'%(url,err))
+				urlForOpenError.warning('%s|%s'%(url,err))
 				return None
 			else:self.fetchHtmlCode(url,numOfRetries-1)
 
@@ -81,6 +83,7 @@ class Spider(object):
 				urlQueue.task_done()
 			except Queue.Empty:
 				print 'kill %s'%threading.currentThread().getName()
+#				log.debug('kill %s'%threading.currentThread().getName())
 				break
 
 			#md5加密url，固定长度，节约内存
@@ -99,9 +102,9 @@ class Spider(object):
 			urls = self.fetchUrls(htmlCode)
 
 			#将其他资源链接保存起来（图片、js、css等）
-			otherRes = self.fetchOtherResource(htmlCode)
+			otherUris= self.fetchOtherUris(htmlCode)
 
-			for rec in otherRes:outQueue.put(rec)
+			for uri in otherUris:outQueue.put(uri)
 
 			inPagelinks = []
 
@@ -148,33 +151,33 @@ class Spider(object):
 		if destUrl == self.domain: return destUrl
 		else: return urlparse.urlparse(destUrl).netloc
 
-	def fetchOtherResource(self,htmlCode):
+	def fetchOtherUris(self,htmlCode):
 		"""抓取图片、js、css、flash、iframe等链接
 		>>> spider = Spider()
 		>>> spider.domain = 'lx.shellcodes.org'
 		>>> htmlCode = '<img src="http://www.baidu.com/logo.png">'
-		>>> spider.fetchOtherResource(htmlCode)	
+		>>> spider.fetchOtherUris(htmlCode)	
 		[]
 		>>> htmlCode =  '<img src="http://lx.shellcodes.org/logo.png">'
-		>>> spider.fetchOtherResource(htmlCode)
+		>>> spider.fetchOtherUris(htmlCode)
 		['http://lx.shellcodes.org/logo.png']
 		>>> htmlCode =  '<img src="http://lx.shellcodes.org/logo.png" />'
-		>>> spider.fetchOtherResource(htmlCode)
+		>>> spider.fetchOtherUris(htmlCode)
 		['http://lx.shellcodes.org/logo.png']
 		>>> htmlCode =  '<IMG src="http://lx.shellcodes.org/logo.png" />'
-		>>> spider.fetchOtherResource(htmlCode)
+		>>> spider.fetchOtherUris(htmlCode)
 		['http://lx.shellcodes.org/logo.png']
 		>>> htmlCode = '<embed src="lx.swf" type="application/x-shockwave-flash"></embed>'
-		>>> spider.fetchOtherResource(htmlCode)
+		>>> spider.fetchOtherUris(htmlCode)
 		['lx.swf']
 		>>> htmlCode = '<embed src="http://lx.com/lx.swf" type="application/x-shockwave-flash"></embed>'
-		>>> spider.fetchOtherResource(htmlCode)
+		>>> spider.fetchOtherUris(htmlCode)
 		[]
 		>>> htmlCode = '<iframe height="256" frameborder="0" width="180" scrolling="" align="center" src="lx.html" name="dmain" marginwidth="0" marginheight="0"></iframe>'
-		>>> spider.fetchOtherResource(htmlCode)
+		>>> spider.fetchOtherUris(htmlCode)
 		['lx.html']
 		"""
-		otherResource = []
+		otherUris= []
 		scriptTags = re.findall(r"(?i)<script\s.*src\s*=\s*[\"']*([^\"'\s]+).*",htmlCode)
 		linkTags = re.findall(r"(?i)<link.*href\s*=\s*[\"']*([^\"'\s]+).*",htmlCode)
 		imgTags = re.findall(r"(?i)<img\s.*src\s*=[\"']*([^\"'\s]+).*",htmlCode)
@@ -182,55 +185,126 @@ class Spider(object):
 		iframeTags = re.findall(r"(?i)<iframe\s.*src\s*=[\"']*([^\"'\s]+).*",htmlCode)
 
 		#不需要来自其他网站的外部链接
-		for src in scriptTags+linkTags+imgTags+embedTags+iframeTags:
-			srcURL = urlparse.urlparse(src)
+		for uri in scriptTags+linkTags+imgTags+embedTags+iframeTags:
+			srcURI = urlparse.urlparse(uri)
 
 			#如果链接里有域名，就看是不是来自自己网站的
-			if srcURL.netloc == '': otherResource.append(src)
-			elif self.isSameDomain(srcURL.netloc): otherResource.append(src)
+			if srcURI.netloc == '': otherUris.append(uri)
+			elif self.isSameDomain(srcURI.netloc): otherUris.append(uri)
 				
-		return otherResource
+		return otherUris
 
 	def fetchUrls(self,htmlCode):
 		'''从html代码中提取超链接'''
 		return re.findall(r"(?i)<a\s+href\s*=\s*[\"']*([^\"'\s]+)[\"']*[^<]+</a>",htmlCode)
 
+	def saveVisited(self):
+		'''将已爬过的连接保存起来'''
+		with open(self.domain+'/visited','w') as f:
+			cPickle.dump(self.visited,f)
+
 class StoreURI(object):
 	def __init__(self,tableName):
-		self.urls = []
+		self.uris = []
 		self.tableName = tableName.replace('.','_')
 		self.db = db.DB(self.tableName)
 
 	def store(self):
 		while True:
 			try:
-				url = outQueue.get(timeout=3)
+				uri = outQueue.get(timeout=3)
 				outQueue.task_done()
 			except Queue.Empty:
 				continue
 
-			if url == 'kill you,by:lu4nx':break
+			if uri == 'kill you,by:lu4nx':break
 
-			if url not in self.urls:
-				self.urls.append(url)
-				print url
-				try: self.storeUrlToDb(url)
+			if uri not in self.uris:
+				self.uris.append(uri)
+				print uri
+				try: self.storeUrlToDb(uri)
 				except Exception,err:
-					log.exception('url %s insert to db error:%s'%(url,err))
+					log.exception('url %s insert to db error:%s'%(uri,err))
 					continue
 
-	def storeUrlToDb(self,url):
+	def storeUrlToDb(self,uri):
 		'''实时存储到数据库中'''
 		#当前日期
 		currentDate = time.strftime('%Y-%m-%d') 
-		self.db.insert(self.tableName,url,currentDate)
+		self.db.insert(self.tableName,uri,currentDate)
 
-def main(rootUrl,threadCount):
+def backLogFile(domain):
+	'''备份日志文件'''
+	if os.path.isfile('%s/%s'%(domain,domain)):
+		os.rename('%s/%s'%(domain,domain),'%s/%s'%(domain,domain+'_%s'%time.strftime('%Y%m%d%H%M%S')))
+
+	os.rename(logFile,'%s/%s'%(domain,domain))
+
+def checkHasErrorUrlFromLog(domain,retryFile):
+	'''检查是否有爬取失败的url
+	>>> checkHasErrorUrl()
+	True
+	'''
+	ret = False
+	retryLogFile = '%s/%s'%(domain,retryFile)
+
+	if os.path.isfile(retryLogFile):
+		with open(retryLogFile) as logFileObj:
+			for line in logFileObj:
+				line = line.split('|')
+
+				#只有第一个字符==u时，才对比整个字符串，提高性能
+				if line[0][0] == 'u' and line[0] == 'urlerror':
+					ret = True
+					break
+
+	return ret
+
+def loadErrorUrl(domain,retryFile):
+	'''加载所有失败的url'''
+	urlList = []
+	retryLogFile = '%s/%s'%(domain,retryFile)
+
+	if os.path.isfile(retryLogFile):
+		with open(retryLogFile,'r') as errorUrl:
+			for line in errorUrl:
+				line = line.split('|')
+				#不加载404的url
+				if line[5].find('404') != -1:continue
+				#日志中第5列是url
+				else:urlList.append(line[4])
+
+	return urlList
+
+def main(rootUrl,threadCount,retryFile):
 	spider = Spider()
 	spider.domain = spider.getUrlDomain(rootUrl)
+	urlObj = StoreURI(spider.domain)
 
-	#插入根url到队列
-	urlQueue.put(rootUrl)
+	#建立存储网站信息的目录
+	if not os.path.isdir(spider.domain):os.mkdir(spider.domain)
+
+	#重新爬失败的url
+	if retryFile and checkHasErrorUrlFromLog(spider.domain,retryFile):
+		#返回需要重新爬取的url列表
+		reTryUrls = loadErrorUrl(spider.domain,retryFile)
+
+		if len(reTryUrls) > 0:
+			print u'发现有以前失败过的url'
+			#载入已爬过的uri
+			for uri in urlObj.db.fetchAllData(spider.domain):urlObj.uris.append(uri)
+
+			#载入已爬过的url
+			#NOTE:注意这里有个漏洞
+			spider.visited = cPickle.load(open(spider.domain+'/visited','r'))
+
+			#载入需要重新爬的url
+			for url in reTryUrls:
+				urlQueue.put(url)	
+		else:urlQueue.put(rootUrl)	
+	else:
+		#插入根url到队列
+		urlQueue.put(rootUrl)
 
 	#创建爬虫的线程池
 	for i in range(threadCount):
@@ -240,7 +314,6 @@ def main(rootUrl,threadCount):
 		thread.start()
 	
 	#创建存储uri的线程
-	urlObj = StoreURI(spider.domain)
 	urlThread = threading.Thread(target=urlObj.store)
 	urlThread.daemon = True
 	urlThread.start()
@@ -248,12 +321,18 @@ def main(rootUrl,threadCount):
 	#等待爬虫线程的结束
 	for _ in threadsPool: _.join()
 
+	#保存已爬过的url
+	spider.saveVisited()
+
 	#通知存储线程结束
 	outQueue.put('kill you,by:lu4nx')
 
 	#等待uri存储线程结束
 	urlThread.join()
-	print u'完成url爬取'
+	print u'工作完毕'
+
+	#备份日志文件
+	backLogFile(spider.domain)
 
 if __name__ == '__main__':
 	opt = optparse.OptionParser(version='0.1',
@@ -261,10 +340,13 @@ if __name__ == '__main__':
 
 	opt.add_option('-u',help='url',dest='rootUrl')
 	opt.add_option('--thread',help=u'线程数，默认10',dest='threadCount',type='int')
-	opt.set_defaults(threadCount=10)
+	opt.add_option('--retryfile',help=u'指定要重爬的日志文件',dest='retryFile')
+	opt.set_defaults(threadCount=10,retryFile=None)
 
 	(opt,args) = opt.parse_args()
 
-	try:
-		main(opt.rootUrl,opt.threadCount)
-	except Exception,err: print u'参数错误，请加参数-h获得帮助信息';print err
+#	try:
+#		main(opt.rootUrl,opt.threadCount,retryFile)
+#	#except Exception,err: print u'参数错误，请加参数-h获得帮助信息';print err
+#	except Exception,err:print err
+	main(opt.rootUrl,opt.threadCount,opt.retryFile)
