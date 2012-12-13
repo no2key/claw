@@ -3,7 +3,7 @@
 
 ##提取日志用的，跟爬虫无关
 
-import sys
+import sys,urllib2
 
 uriList = []
 
@@ -24,6 +24,6 @@ if __name__ == '__main__':
 			line = line.split(' ')[8]
 		except:continue
 
-		if line not in uriList:
+		if urllib2.unquote(line) not in uriList:
 			print logLine
 
