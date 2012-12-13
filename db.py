@@ -29,8 +29,7 @@ class DB(object):
 			
 	def fetchUrls(self,tableName):
 		if self.conn:
-			sql = "select * from %s"%tableName
-			self.cur.execute(sql)
+			self.cur.execute("select * from %s",tableName)
 			return self.cur.fetchall()
 		else: print 'database connect error'
 
@@ -53,7 +52,7 @@ class DB(object):
 			tableName = tableName.replace('.','_')
 			tableName = tableName.replace('-','_')
 
-			dataCount = self.cur.execute('select uri from %s'%tableName)
+			dataCount = self.cur.execute('select uri from %s',tableName)
 
 			if dataCount > 0:
 				return self.cur.fetchall()
