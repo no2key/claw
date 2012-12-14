@@ -8,6 +8,7 @@
 import urllib2 as urllib
 import optparse,threading,Queue,urlparse,time,os,sys,re,gzip,StringIO,hashlib,logging,cPickle
 import db
+
 #threading._VERBOSE=True	#线程调试
 
 urlQueue = Queue.Queue()
@@ -49,7 +50,8 @@ class DownloadPage(object):
 				#把重试失败的记录写到日志文件中
 				urlForOpenError.warning('%s|%s'%(url,err))
 				return None
-			else:self.fetchHtmlCode(url,numOfRetries-1)
+			else:
+				self.fetchHtmlCode(url,numOfRetries-1)
 
 	def extractHTML(self,htmlCode):
 		'''解压Gzip压缩过的HTML代码'''
@@ -87,13 +89,16 @@ class Spider(object):
 				break
 
 			#md5加密url，固定长度，节约内存
-			if hashlib.md5(url).hexdigest() in self.visited: continue
+			if hashlib.md5(url).hexdigest() in self.visited:
+				continue
 			#在对url发起连接的之前就把这个url保存起来，如果无法打开这个url，再遇到这个url时就不用再去连接一次了
-			else:self.visited.append(hashlib.md5(url).hexdigest())
+			else:
+				self.visited.append(hashlib.md5(url).hexdigest())
 
 			htmlCode = downPageObj.fetchHtmlCode(url)
 
-			if htmlCode == None:continue
+			if htmlCode == None:
+				continue
 
 			#处理两种情况：1.重定向;2.url=http://test/x,如果是目录,url=http://test/x/, 否则url=http://test/x
 			realUrl = downPageObj.getRealUrl()
@@ -104,17 +109,22 @@ class Spider(object):
 			#将其他资源链接保存起来（图片、js、css等）
 			otherUris= self.fetchOtherUris(htmlCode)
 
-			for uri in otherUris:outQueue.put(uri)
+			for uri in otherUris:
+				outQueue.put(uri)
 
 			inPagelinks = []
 
 			for link in urls:
-				if link == None: continue
-				elif link.find('#') != -1 or link[0:11] == ('javascript:'): continue
+				if link == None:
+					continue
+				elif link.find('#') != -1 or link.startswith('javascript:'):
+					continue
+
 				realLink = link
 				link = urlparse.urljoin(realUrl,link)
-#				if self.isSameDomain(link):
+
 				#同一个站点的url才保存
+				#if self.isSameDomain(link):
 				if self.isSameSite(link): 
 					inPagelinks.append(link)
 					outQueue.put(realLink)
@@ -122,22 +132,30 @@ class Spider(object):
 			#过滤掉重复的
 			set(inPagelinks)
 
-			for url in inPagelinks: urlQueue.put(url)
+			for url in inPagelinks:
+				urlQueue.put(url)
 
 	def isSameDomain(self,url):
 		'''判断url的域名与所爬网站的域名是否相等'''
-		if self.getUrlDomain(url) == self.domain: return True
-		else: return False
+		ret = False
+
+		if self.getUrlDomain(url) == self.domain:
+			ret = True
+
+		return ret
 
 	def isSameSite(self,url):
 		'''判断url是否与所爬的url来自同一站点'''
 		#www.xxx.com -> .xxx.com
+		ret = False
 		domain1 = self.domain[self.domain.find('.'):]
 		domain2 = self.getUrlDomain(url)
 		domain2 = domain2[domain2.find('.'):]
 
-		if domain2 != domain1: return False
-		else: return True 
+		if domain1[0] == domain2[0] and domain1 == domain2:
+			ret = True 
+
+		return ret
 
 	def getUrlDomain(self,destUrl):
 		"""
@@ -148,8 +166,10 @@ class Spider(object):
 		>>> spider.getUrlDomain('lx.shellcodes.org')
 		'lx.shellcodes.org'
 		"""
-		if destUrl == self.domain: return destUrl
-		else: return urlparse.urlparse(destUrl).netloc
+		if destUrl == self.domain:
+			return destUrl
+		else:
+			return urlparse.urlparse(destUrl).netloc
 
 	def fetchOtherUris(self,htmlCode):
 		"""抓取图片、js、css、flash、iframe等链接
@@ -189,8 +209,10 @@ class Spider(object):
 			srcURI = urlparse.urlparse(uri)
 
 			#如果链接里有域名，就看是不是来自自己网站的
-			if srcURI.netloc == '': otherUris.append(uri)
-			elif self.isSameDomain(srcURI.netloc): otherUris.append(uri)
+			if srcURI.netloc == '':
+				otherUris.append(uri)
+			elif self.isSameDomain(srcURI.netloc):
+				otherUris.append(uri)
 				
 		return otherUris
 
@@ -204,6 +226,7 @@ class Spider(object):
 			cPickle.dump(self.visited,f)
 
 class StoreURI(object):
+
 	def __init__(self,tableName):
 		self.uris = []
 		self.tableName = tableName.replace('.','_')
@@ -217,12 +240,14 @@ class StoreURI(object):
 			except Queue.Empty:
 				continue
 
-			if uri == 'kill you,by:lu4nx':break
+			if uri == 'kill you,by:lu4nx':
+				break
 
 			if uri not in self.uris:
 				self.uris.append(uri)
 				print uri
-				try: self.storeUrlToDb(uri)
+				try:
+					self.storeUrlToDb(uri)
 				except Exception,err:
 					log.exception('url %s insert to db error:%s'%(uri,err))
 					continue
@@ -232,6 +257,7 @@ class StoreURI(object):
 		#当前日期
 		currentDate = time.strftime('%Y-%m-%d') 
 		self.db.insert(self.tableName,uri,currentDate)
+
 
 def backLogFile(domain):
 	'''备份日志文件'''
@@ -270,9 +296,11 @@ def loadErrorUrl(domain,retryFile):
 			for line in errorUrl:
 				line = line.split('|')
 				#不加载404的url
-				if line[5].find('404') != -1:continue
-				#日志中第5列是url
-				else:urlList.append(line[4])
+				if line[5].find('404') != -1:
+					continue
+				else:
+					#日志中第5列是url
+					urlList.append(line[4])
 
 	return urlList
 
@@ -282,7 +310,8 @@ def main(rootUrl,threadCount,retryFile):
 	urlObj = StoreURI(spider.domain)
 
 	#建立存储网站信息的目录
-	if not os.path.isdir(spider.domain):os.mkdir(spider.domain)
+	if not os.path.isdir(spider.domain):
+		os.mkdir(spider.domain)
 
 	#重新爬失败的url
 	if retryFile and checkHasErrorUrlFromLog(spider.domain,retryFile):
@@ -292,7 +321,8 @@ def main(rootUrl,threadCount,retryFile):
 		if len(reTryUrls) > 0:
 			print u'发现有以前失败过的url'
 			#载入已爬过的uri
-			for uri in urlObj.db.fetchAllData(spider.domain):urlObj.uris.append(uri)
+			for uri in urlObj.db.fetchAllData(spider.domain):
+				urlObj.uris.append(uri)
 
 			#载入已爬过的url
 			#NOTE:注意这里有个漏洞
@@ -301,7 +331,8 @@ def main(rootUrl,threadCount,retryFile):
 			#载入需要重新爬的url
 			for url in reTryUrls:
 				urlQueue.put(url)	
-		else:urlQueue.put(rootUrl)	
+		else:
+			urlQueue.put(rootUrl)	
 	else:
 		#插入根url到队列
 		urlQueue.put(rootUrl)
@@ -319,7 +350,8 @@ def main(rootUrl,threadCount,retryFile):
 	urlThread.start()
 	
 	#等待爬虫线程的结束
-	for _ in threadsPool: _.join()
+	for _ in threadsPool:
+		_.join()
 
 	#保存已爬过的url
 	spider.saveVisited()
